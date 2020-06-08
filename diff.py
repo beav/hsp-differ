@@ -28,6 +28,12 @@ parser = argparse.ArgumentParser(description="view changes for an insights host"
 parser.add_argument("inventory_id")
 parser.add_argument("api_username")
 parser.add_argument("api_password")
+parser.add_argument(
+    "-a",
+    "--api_hostname",
+    default="cloud.redhat.com",
+    help="API hostname to connect to",
+)
 
 args = parser.parse_args()
 
@@ -35,7 +41,7 @@ inv_uuid = args.inventory_id
 
 tqdm.write("fetching historical profiles...")
 response = requests.get(
-    f"https://cloud.redhat.com/api/historical-system-profiles/v1/systems/{inv_uuid}",
+    f"https://{args.api_hostname}/api/historical-system-profiles/v1/systems/{inv_uuid}",
     auth=(args.api_username, args.api_password),
 )
 
