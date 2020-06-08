@@ -26,6 +26,13 @@ def _make_request(url, username, password, ssl_verify):
     return result
 
 
+def _fetch_comparison(hsps):
+    n = 0
+    while n < len(hsps) - 1:
+        yield diff(hsps[n], hsps[n + 1])
+        n = n + 1
+
+
 def get_hsp(profile_id, args):
     result = _make_request(
         get_profile_url % (args.api_hostname, profile_id),
@@ -49,8 +56,10 @@ def clean_hsp(hsp):
         p for p in hsp["running_processes"] if not p.startswith("kworker")
     }
     hsp["running_processes"] = running_processes
+    hsp["installed_packages"] = {p for p in hsp["installed_packages"]}
     installed_products = {p.get("id") for p in hsp["installed_products"]}
     hsp["installed_products"] = installed_products
+    hsp["kernel_modules"] = {k for k in hsp["kernel_modules"]}
     del hsp["id"]
     del hsp["last_boot_time"]  # this toggles and is not usable currently
     return hsp
@@ -115,14 +124,19 @@ for profile in tqdm(profiles, unit="profile"):
     raw_hsp = get_hsp(profile["id"], args)
     hsps.append(clean_hsp(raw_hsp))
 
+sorted_hsps = sorted(hsps, key=lambda hsp: hsp.get("captured_date"))
 
-for i in reversed(range(1, len(hsps))):
+
+print(
+    f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n"
+)
+
+for comparison in _fetch_comparison(sorted_hsps):
+    newline = "\n\t\t\t"
     report = {"changes": [], "added": [], "removed": []}
-    hspdiff = diff(hsps[i], hsps[i - 1])
-    for d in hspdiff:
+    for d in comparison:
         if d[0] == "change":
-            if d[1] not in ("captured_date",):
-                report["changes"].append(d[1:])
+            report["changes"].append(d[1:])
         elif d[0] == "add":
             report["added"].append(d[1:])
         elif d[0] == "remove":
@@ -132,19 +146,20 @@ for i in reversed(range(1, len(hsps))):
         # no change, keep on truckin
         continue
     else:
-        print(
-            f"changes from {hsps[i]['captured_date']} to {hsps[i-1]['captured_date']}:"
-        )
+        for change in report["changes"]:
+            if change[0] == "captured_date":
+                print(f"changes from {change[1][0]} to {change[1][1]}")
         for c in report["changes"]:
-            print("\tCHANGED:")
-            print(f"\t\t{c[0]}:")
-            print(f"\t\t\tFROM:\t{c[1][0]}")
-            print(f"\t\t\tTO:\t{c[1][1]}")
+            if change[0] != "captured_date":
+                print("\tCHANGED:")
+                print(f"\t\t{c[0]}:")
+                print(f"\t\t\tFROM:\t{c[1][0]}")
+                print(f"\t\t\tTO:\t{c[1][1]}")
         for a in report["added"]:
             print("\tADDED:")
             print(f"\t\t{a[0]}:")
-            print(f"\t\t\t\t{a[1][0][1]}")
+            print(f"\t\t\t{newline.join(sorted(a[1][0][1]))}")
         for r in report["removed"]:
             print("\tREMOVED:")
             print(f"\t\t{r[0]}:")
-            print(f"\t\t\t\t{r[1][0][1]}")
+            print(f"\t\t\t{newline.join(sorted(r[1][0][1]))}")
