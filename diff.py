@@ -3,6 +3,7 @@ import argparse
 import json
 from tqdm.auto import tqdm
 from dictdiffer import diff
+import uuid
 
 
 def get_hsp(profile_id, args):
@@ -13,6 +14,14 @@ def get_hsp(profile_id, args):
     return response.json()["data"][0]["system_profile"]
 
 
+def _is_uuid(input_string):
+    try:
+        uuid.UUID(input_string)
+        return True
+    except:
+        return False
+
+
 def clean_hsp(hsp):
     running_processes = {
         p for p in hsp["running_processes"] if not p.startswith("kworker")
@@ -21,6 +30,7 @@ def clean_hsp(hsp):
     installed_products = {p.get("id") for p in hsp["installed_products"]}
     hsp["installed_products"] = installed_products
     del hsp["id"]
+    del hsp["last_boot_time"]  # this toggles and is not usable currently
     return hsp
 
 
@@ -39,11 +49,28 @@ args = parser.parse_args()
 
 inv_uuid = args.inventory_id
 
-tqdm.write("fetching historical profiles...")
+if not _is_uuid(args.inventory_id):
+    # assume we got a display name if we didn't get a uuid
+    inv_record = requests.get(
+        f"https://{args.api_hostname}/api/inventory/v1/hosts?display_name={inv_uuid}",
+        auth=(args.api_username, args.api_password),
+    ).json()
+    inv_uuid = inv_record["results"][0]["id"]
+
+
+host_data = requests.get(
+    f"https://{args.api_hostname}/api/inventory/v1/hosts/{inv_uuid}",
+    auth=(args.api_username, args.api_password),
+).json()
+
+display_name = host_data["results"][0]["display_name"]
+
+tqdm.write(f"fetching historical profiles for {display_name}...")
 response = requests.get(
     f"https://{args.api_hostname}/api/historical-system-profiles/v1/systems/{inv_uuid}",
     auth=(args.api_username, args.api_password),
 )
+
 
 changes = response.json()
 profiles = changes["data"][0]["profiles"]
@@ -60,7 +87,8 @@ for i in reversed(range(1, len(hsps))):
     hspdiff = diff(hsps[i], hsps[i - 1])
     for d in hspdiff:
         if d[0] == "change":
-            report["changes"].append(d[1:])
+            if d[1] not in ("captured_date",):
+                report["changes"].append(d[1:])
         elif d[0] == "add":
             report["added"].append(d[1:])
         elif d[0] == "remove":
@@ -71,7 +99,7 @@ for i in reversed(range(1, len(hsps))):
         continue
     else:
         print(
-            f"changes from {hsps[i-1]['captured_date']} to {hsps[i]['captured_date']}:"
+            f"changes from {hsps[i]['captured_date']} to {hsps[i-1]['captured_date']}:"
         )
         for c in report["changes"]:
             print("\tCHANGED:")
@@ -81,8 +109,8 @@ for i in reversed(range(1, len(hsps))):
         for a in report["added"]:
             print("\tADDED:")
             print(f"\t\t{a[0]}:")
-            print(f"\t\t\t\t{a[1]}")
+            print(f"\t\t\t\t{a[1][0][1]}")
         for r in report["removed"]:
             print("\tREMOVED:")
             print(f"\t\t{r[0]}:")
-            print(f"\t\t\t\t{r[1]}")
+            print(f"\t\t\t\t{r[1][0][1]}")
