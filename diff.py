@@ -35,25 +35,34 @@ def clean_hsp(hsp):
 
 
 parser = argparse.ArgumentParser(description="view changes for an insights host")
-parser.add_argument("inventory_id")
-parser.add_argument("api_username")
-parser.add_argument("api_password")
+parser.add_argument("inventory_id", help="inventory ID or display name")
+parser.add_argument("api_username", help="cloud.redhat.com username")
+parser.add_argument("api_password", help="cloud.redhat.com password")
 parser.add_argument(
     "-a",
     "--api_hostname",
     default="cloud.redhat.com",
     help="API hostname to connect to",
 )
+parser.add_argument(
+    "--disable-tls-validation",
+    dest="tls_validation",
+    action="store_false",
+    help="disable TLS validation (only useful for testing)",
+)
+parser.set_defaults(tls_validation=True)
 
 args = parser.parse_args()
 
 inv_uuid = args.inventory_id
+verify = args.tls_validation
 
 if not _is_uuid(args.inventory_id):
     # assume we got a display name if we didn't get a uuid
     inv_record = requests.get(
         f"https://{args.api_hostname}/api/inventory/v1/hosts?display_name={inv_uuid}",
         auth=(args.api_username, args.api_password),
+        verify=verify,
     ).json()
     inv_uuid = inv_record["results"][0]["id"]
 
@@ -61,6 +70,7 @@ if not _is_uuid(args.inventory_id):
 host_data = requests.get(
     f"https://{args.api_hostname}/api/inventory/v1/hosts/{inv_uuid}",
     auth=(args.api_username, args.api_password),
+    verify=verify,
 ).json()
 
 display_name = host_data["results"][0]["display_name"]
@@ -69,6 +79,7 @@ tqdm.write(f"fetching historical profiles for {display_name}...")
 response = requests.get(
     f"https://{args.api_hostname}/api/historical-system-profiles/v1/systems/{inv_uuid}",
     auth=(args.api_username, args.api_password),
+    verify=verify,
 )
 
 
