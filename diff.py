@@ -1,17 +1,39 @@
 import requests
+from http import HTTPStatus
 import argparse
 import json
 from tqdm.auto import tqdm
 from dictdiffer import diff
 import uuid
 
+get_host_by_name_url = "https://%s/api/inventory/v1/hosts?display_name=%s"
+get_host_url = "https://%s/api/inventory/v1/hosts/%s"
+get_profile_url = "https://%s/api/historical-system-profiles/v1/profiles/%s"
+get_profile_list_url = "https://%s/api/historical-system-profiles/v1/systems/%s"
+
+
+def _make_request(url, username, password, ssl_verify):
+    response = requests.get(
+        url, auth=(args.api_username, args.api_password), verify=ssl_verify
+    )
+    if response.status_code != HTTPStatus.OK:
+        raise "bad response from server: %s" % response.status_code
+    result = response.json()
+    if "data" in result and len(result["data"]) == 0:
+        raise RuntimeError("no results found for request")
+    elif "results" in result and len(result["results"]) == 0:
+        raise RuntimeError("no results found for request")
+    return result
+
 
 def get_hsp(profile_id, args):
-    response = requests.get(
-        f"https://cloud.redhat.com/api/historical-system-profiles/v1/profiles/{profile_id}",
-        auth=(args.api_username, args.api_password),
+    result = _make_request(
+        get_profile_url % (args.api_hostname, profile_id),
+        args.api_username,
+        args.api_password,
+        args.ssl_verify,
     )
-    return response.json()["data"][0]["system_profile"]
+    return result["data"][0]["system_profile"]
 
 
 def _is_uuid(input_string):
@@ -45,10 +67,10 @@ parser.add_argument(
     help="API hostname to connect to",
 )
 parser.add_argument(
-    "--disable-tls-validation",
-    dest="tls_validation",
+    "--disable-ssl-verify",
+    dest="ssl_verify",
     action="store_false",
-    help="disable TLS validation (only useful for testing)",
+    help="disable SSL hostname verification (only useful for testing)",
 )
 parser.set_defaults(tls_validation=True)
 
@@ -57,33 +79,34 @@ args = parser.parse_args()
 inv_uuid = args.inventory_id
 verify = args.tls_validation
 
+
 if not _is_uuid(args.inventory_id):
     # assume we got a display name if we didn't get a uuid
-    inv_record = requests.get(
-        f"https://{args.api_hostname}/api/inventory/v1/hosts?display_name={inv_uuid}",
-        auth=(args.api_username, args.api_password),
-        verify=verify,
-    ).json()
+    inv_record = _make_request(
+        get_host_by_name_url % (args.api_hostname, args.inventory_id),
+        args.api_username,
+        args.api_password,
+        args.ssl_verify,
+    )
     inv_uuid = inv_record["results"][0]["id"]
 
 
-host_data = requests.get(
-    f"https://{args.api_hostname}/api/inventory/v1/hosts/{inv_uuid}",
-    auth=(args.api_username, args.api_password),
-    verify=verify,
-).json()
+host_data = _make_request(
+    get_host_url % (args.api_hostname, inv_uuid),
+    args.api_username,
+    args.api_password,
+    args.ssl_verify,
+)
 
 display_name = host_data["results"][0]["display_name"]
 
 tqdm.write(f"fetching historical profiles for {display_name}...")
-response = requests.get(
-    f"https://{args.api_hostname}/api/historical-system-profiles/v1/systems/{inv_uuid}",
-    auth=(args.api_username, args.api_password),
-    verify=verify,
+changes = _make_request(
+    get_profile_list_url % (args.api_hostname, inv_uuid),
+    args.api_username,
+    args.api_password,
+    args.ssl_verify,
 )
-
-
-changes = response.json()
 profiles = changes["data"][0]["profiles"]
 
 
