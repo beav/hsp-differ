@@ -9,6 +9,7 @@ verify_ssl = true
 requests = "*"
 dictdiffer = "*"
 tqdm = "*"
+frozendict = "*"
 
 [requires]
 python_version = "3.8"
