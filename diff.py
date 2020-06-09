@@ -70,6 +70,14 @@ def _parse_network_interfaces(interfaces):
     return parsed_interfaces
 
 
+def _parse_dnf_modules(modules):
+    parsed_modules = set()
+    module_template = "%s %s"
+    for module in modules:
+        parsed_modules.add(module_template % (module["name"], module["stream"]))
+    return parsed_modules
+
+
 def clean_hsp(hsp):
     running_processes = {
         p for p in hsp["running_processes"] if not p.startswith("kworker")
@@ -79,6 +87,9 @@ def clean_hsp(hsp):
     installed_products = {p.get("id") for p in hsp["installed_products"]}
     hsp["installed_products"] = installed_products
     hsp["kernel_modules"] = {k for k in hsp["kernel_modules"]}
+    hsp["installed_services"] = {s for s in hsp["installed_services"]}
+    hsp["enabled_services"] = {s for s in hsp["enabled_services"]}
+    hsp["dnf_modules"] = _parse_dnf_modules(hsp["dnf_modules"])
     hsp["network_interfaces"] = _parse_network_interfaces(hsp["network_interfaces"])
     del hsp["id"]
     del hsp["last_boot_time"]  # this toggles and is not usable currently
