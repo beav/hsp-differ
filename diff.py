@@ -54,19 +54,28 @@ def _is_uuid(input_string):
 
 def _parse_network_interfaces(interfaces):
     parsed_interfaces = set()
-    interface_template = "[%s]|type: %s|state: %s|ipv4 addresses: %s|ipv6 addresses: %s|mac_address: %s|mtu: %s"
-    interface_template = interface_template.replace("|", "\n\t\t\t\t ")
+    interface_template_v4_addrs = "[%s] ipv4 addresses: %s"
+    interface_template_v6_addrs = "[%s] ipv6 addresses: %s"
+    interface_template = "[%s] type: %s state: %s mac_address: %s mtu: %s"
     for iface in interfaces:
-        interface_tuple = (
-            iface.get("name"),
-            iface.get("type"),
-            iface.get("state"),
-            ", ".join(iface.get("ipv4_addresses", [])),
-            ", ".join(iface.get("ipv6_addresses", [])),
-            iface.get("mac_address"),
-            iface.get("mtu"),
+        parsed_interfaces.add(
+            interface_template
+            % (
+                iface.get("name"),
+                iface.get("type"),
+                iface.get("state"),
+                iface.get("mac_address"),
+                iface.get("mtu"),
+            )
         )
-        parsed_interfaces.add(interface_template % interface_tuple)
+        parsed_interfaces.add(
+            interface_template_v4_addrs
+            % (iface.get("name"), ", ".join(iface.get("ipv4_addresses", [])),)
+        )
+        parsed_interfaces.add(
+            interface_template_v6_addrs
+            % (iface.get("name"), ", ".join(iface.get("ipv6_addresses", [])),)
+        )
     return parsed_interfaces
 
 
