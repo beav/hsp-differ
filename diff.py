@@ -3,7 +3,6 @@ from http import HTTPStatus
 import json
 import uuid
 import requests
-from frozendict import frozendict
 
 from dictdiffer import diff
 from tqdm.auto import tqdm
