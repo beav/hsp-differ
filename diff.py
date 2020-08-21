@@ -29,7 +29,7 @@ def _make_request(url, username, password, ssl_verify):
         url, auth=(args.api_username, args.api_password), verify=ssl_verify
     )
     if response.status_code != HTTPStatus.OK:
-        raise ValueError("bad response from server: %s" % response.status_code)
+        raise RuntimeError("bad response from server: %s" % response.status_code)
     result = response.json()
     if "data" in result and len(result["data"]) == 0:
         raise RuntimeError("no results found for request")
