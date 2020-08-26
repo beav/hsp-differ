@@ -6,6 +6,7 @@ import requests
 import sys
 from difflib import unified_diff
 
+import dateparser
 from dictdiffer import diff
 from tqdm.auto import tqdm
 
@@ -181,11 +182,19 @@ parser.add_argument(
 )
 parser.set_defaults(diff_view=False)
 
+parser.add_argument(
+    "--from_date",
+    help="provide start of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --to_date"
+)
+parser.add_argument(
+    "--to_date",
+    help="provide end of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --from_date"
+)
+
 args = parser.parse_args()
 
 inv_uuid = args.inventory_id
 verify = args.tls_validation
-
 
 if not _is_uuid(args.inventory_id):
     # assume we got a display name if we didn't get a uuid
@@ -223,6 +232,20 @@ for profile in tqdm(profiles, unit="profile"):
     hsps.append(clean_hsp(raw_hsp))
 
 sorted_hsps = sorted(hsps, key=lambda hsp: hsp.get("captured_date"))
+
+if args.from_date and args.to_date:
+    from_date = dateparser.parse(args.from_date, settings={'RETURN_AS_TIMEZONE_AWARE': True})
+    to_date = dateparser.parse(args.to_date, settings={'RETURN_AS_TIMEZONE_AWARE': True})
+    ranged_sorted_hsps = []
+    
+    for hsp in sorted_hsps:
+        captured = dateparser.parse(hsp['captured_date'])
+        if from_date < captured < to_date:
+            ranged_sorted_hsps.append(hsp)
+    sorted_hsps = ranged_sorted_hsps
+    if not sorted_hsps:
+        print("No hsps within this date range.")
+        sys.exit(0)
 
 if args.diff_view:
     for unified in _fetch_unified_comparison(sorted_hsps):
