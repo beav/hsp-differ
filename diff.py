@@ -1,3 +1,4 @@
+import re
 import argparse
 from http import HTTPStatus
 import json
@@ -9,6 +10,8 @@ from difflib import unified_diff
 import dateparser
 from dictdiffer import diff
 from tqdm.auto import tqdm
+
+from insights.parsers.installed_rpms import InstalledRpm
 
 get_host_by_name_url = "https://%s/api/inventory/v1/hosts?display_name=%s"
 get_host_url = "https://%s/api/inventory/v1/hosts/%s"
@@ -136,13 +139,37 @@ def _parse_dnf_modules(modules):
         parsed_modules.add(module_template % (module["name"], module["stream"]))
     return parsed_modules
 
+def get_name_vra_from_string(rpm_string, part):
+    """
+    small helper to pull name + version/release/arch from string
+    This supports two styles: ENVRA and NEVRA. The latter is preferred.
+    """
+    try:
+        if re.match("^[0-9]+:", rpm_string):
+            _, remainder = rpm_string.split(":", maxsplit=1)
+            rpm = InstalledRpm.from_package(remainder)
+        else:
+            rpm = InstalledRpm.from_package(rpm_string)
+    except TypeError:
+        raise UnparsableNEVRAError("unable to parse %s into nevra" % rpm_string)
+
+    vra = rpm.version if rpm.version else ""
+    if rpm.release:
+        vra = vra + "-" + rpm.release
+    if rpm.arch:
+        vra = vra + "." + rpm.arch
+
+    if part == "name":
+        return rpm.name
+    else:
+        return vra
 
 def clean_hsp(hsp):
     running_processes = {
         p for p in hsp["running_processes"] if not p.startswith("kworker")
     }
     hsp["running_processes"] = running_processes
-    hsp["installed_packages"] = {p for p in hsp["installed_packages"]}
+    hsp["installed_packages"] = {get_name_vra_from_string(p, "name"):get_name_vra_from_string(p, "vra") for p in hsp["installed_packages"]}
     installed_products = {p.get("id") for p in hsp["installed_products"]}
     hsp["installed_products"] = installed_products
     hsp["kernel_modules"] = {k for k in hsp["kernel_modules"]}
