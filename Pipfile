@@ -10,6 +10,7 @@ requests = "*"
 dictdiffer = "*"
 tqdm = "*"
 dateparser = "*"
+insights-core = "*"
 
 [requires]
 python_version = "3.8"
