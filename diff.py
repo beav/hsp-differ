@@ -8,6 +8,7 @@ import sys
 from difflib import unified_diff
 
 import dateparser
+import datetime
 from dictdiffer import diff
 from tqdm.auto import tqdm
 
@@ -267,9 +268,10 @@ if args.from_date and args.to_date:
     
     for hsp in sorted_hsps:
         captured = dateparser.parse(hsp['captured_date'])
-        if from_date < captured < to_date:
+        if from_date < captured < to_date + datetime.timedelta(days=1):
             ranged_sorted_hsps.append(hsp)
     sorted_hsps = ranged_sorted_hsps
+    print(f"Change report for {display_name} from {args.from_date} to {args.to_date}\n\n")
     if not sorted_hsps:
         print("No hsps within this date range.")
         sys.exit(0)
@@ -281,9 +283,8 @@ if args.diff_view:
     sys.exit(0)
 
 # TODO:  refactor and put "diff_view" check in an if/else; get rid of exit(0)
-print(
-    f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n"
-)
+if not args.from_date and not args.to_date:
+    print(f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n")
 
 for comparison in _fetch_comparison(sorted_hsps):
     newline = "\n\t\t\t"
@@ -299,9 +300,7 @@ for comparison in _fetch_comparison(sorted_hsps):
     if len(report["changes"]) + len(report["added"]) + len(report["removed"]) == 0:
         continue
     elif len(report["changes"]) == 1 and report["changes"][0][0] == "captured_date":
-        print(
-            f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE"
-        )
+        print(f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE")
     else:
         for change in report["changes"]:
             if change[0] == "captured_date":
