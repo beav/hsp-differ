@@ -300,7 +300,7 @@ for comparison in _fetch_comparison(sorted_hsps):
         continue
     elif len(report["changes"]) == 1 and report["changes"][0][0] == "captured_date":
         print(
-            f"no detected changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}"
+            f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE\n"
         )
     else:
         for change in report["changes"]:
