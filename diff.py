@@ -271,6 +271,7 @@ if args.from_date and args.to_date:
         if from_date < captured < to_date + datetime.timedelta(days=1):
             ranged_sorted_hsps.append(hsp)
     sorted_hsps = ranged_sorted_hsps
+    print(f"Change report for {display_name} from {args.from_date} to {args.to_date}\n\n")
     if not sorted_hsps:
         print("No hsps within this date range.")
         sys.exit(0)
@@ -282,9 +283,8 @@ if args.diff_view:
     sys.exit(0)
 
 # TODO:  refactor and put "diff_view" check in an if/else; get rid of exit(0)
-print(
-    f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n"
-)
+if not args.from_date and not args.to_date:
+    print(f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n")
 
 for comparison in _fetch_comparison(sorted_hsps):
     newline = "\n\t\t\t"
