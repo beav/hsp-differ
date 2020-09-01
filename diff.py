@@ -107,29 +107,16 @@ def _parse_yum_repos(repos):
 
 
 def _parse_network_interfaces(interfaces):
-    parsed_interfaces = set()
-    interface_template_v4_addrs = "[%s] ipv4 addresses: %s"
-    interface_template_v6_addrs = "[%s] ipv6 addresses: %s"
-    interface_template = "[%s] type: %s state: %s mac_address: %s mtu: %s"
+    parsed_interfaces = {}
     for iface in interfaces:
-        parsed_interfaces.add(
-            interface_template
-            % (
-                iface.get("name"),
-                iface.get("type"),
-                iface.get("state"),
-                iface.get("mac_address"),
-                iface.get("mtu"),
-            )
-        )
-        parsed_interfaces.add(
-            interface_template_v4_addrs
-            % (iface.get("name"), ", ".join(iface.get("ipv4_addresses", [])),)
-        )
-        parsed_interfaces.add(
-            interface_template_v6_addrs
-            % (iface.get("name"), ", ".join(iface.get("ipv6_addresses", [])),)
-        )
+        parsed_interfaces[iface.get("name")] = {
+            "ipv4 addresses": iface.get("ipv4_addresses", []),
+            "ipv6 addresses": iface.get("ipv6_addresses", []),
+            "type": iface.get("type"),
+            "state": iface.get("state"),
+            "mac_address": iface.get("mac_address"),
+            "mtu": iface.get("mtu"),
+        }
     return parsed_interfaces
 
 
@@ -139,6 +126,7 @@ def _parse_dnf_modules(modules):
     for module in modules:
         parsed_modules.add(module_template % (module["name"], module["stream"]))
     return parsed_modules
+
 
 def get_name_vra_from_string(rpm_string, part):
     """
@@ -165,12 +153,16 @@ def get_name_vra_from_string(rpm_string, part):
     else:
         return vra
 
+
 def clean_hsp(hsp):
     running_processes = {
         p for p in hsp["running_processes"] if not p.startswith("kworker")
     }
     hsp["running_processes"] = running_processes
-    hsp["installed_packages"] = {get_name_vra_from_string(p, "name"):get_name_vra_from_string(p, "vra") for p in hsp["installed_packages"]}
+    hsp["installed_packages"] = {
+        get_name_vra_from_string(p, "name"): get_name_vra_from_string(p, "vra")
+        for p in hsp["installed_packages"]
+    }
     installed_products = {p.get("id") for p in hsp["installed_products"]}
     hsp["installed_products"] = installed_products
     hsp["kernel_modules"] = {k for k in hsp["kernel_modules"]}
@@ -212,11 +204,11 @@ parser.set_defaults(diff_view=False)
 
 parser.add_argument(
     "--from_date",
-    help="provide start of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --to_date"
+    help="provide start of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --to_date",
 )
 parser.add_argument(
     "--to_date",
-    help="provide end of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --from_date"
+    help="provide end of date range in format '2020-08-19', 'yesterday', 'AUG 31', etc, must also provide --from_date",
 )
 
 args = parser.parse_args()
@@ -262,16 +254,22 @@ for profile in tqdm(profiles, unit="profile"):
 sorted_hsps = sorted(hsps, key=lambda hsp: hsp.get("captured_date"))
 
 if args.from_date and args.to_date:
-    from_date = dateparser.parse(args.from_date, settings={'RETURN_AS_TIMEZONE_AWARE': True})
-    to_date = dateparser.parse(args.to_date, settings={'RETURN_AS_TIMEZONE_AWARE': True})
+    from_date = dateparser.parse(
+        args.from_date, settings={"RETURN_AS_TIMEZONE_AWARE": True}
+    )
+    to_date = dateparser.parse(
+        args.to_date, settings={"RETURN_AS_TIMEZONE_AWARE": True}
+    )
     ranged_sorted_hsps = []
-    
+
     for hsp in sorted_hsps:
-        captured = dateparser.parse(hsp['captured_date'])
+        captured = dateparser.parse(hsp["captured_date"])
         if from_date < captured < to_date + datetime.timedelta(days=1):
             ranged_sorted_hsps.append(hsp)
     sorted_hsps = ranged_sorted_hsps
-    print(f"Change report for {display_name} from {args.from_date} to {args.to_date}\n\n")
+    print(
+        f"Change report for {display_name} from {args.from_date} to {args.to_date}\n\n"
+    )
     if not sorted_hsps:
         print("No hsps within this date range.")
         sys.exit(0)
@@ -284,7 +282,9 @@ if args.diff_view:
 
 # TODO:  refactor and put "diff_view" check in an if/else; get rid of exit(0)
 if not args.from_date and not args.to_date:
-    print(f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n")
+    print(
+        f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n"
+    )
 
 for comparison in _fetch_comparison(sorted_hsps):
     newline = "\n\t\t\t"
@@ -300,7 +300,9 @@ for comparison in _fetch_comparison(sorted_hsps):
     if len(report["changes"]) + len(report["added"]) + len(report["removed"]) == 0:
         continue
     elif len(report["changes"]) == 1 and report["changes"][0][0] == "captured_date":
-        print(f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE")
+        print(
+            f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE"
+        )
     else:
         for change in report["changes"]:
             if change[0] == "captured_date":
@@ -309,17 +311,26 @@ for comparison in _fetch_comparison(sorted_hsps):
             print("\tCHANGED:")
         for c in report["changes"]:
             if c[0] != "captured_date":
-                print(f"\t\t{c[0]}:")
+                if type(c[0]) is list:
+                    print(f"\t\t{'-'.join([str(name) for name in c[0]][:-1])}:")
+                else:
+                    print(f"\t\t{c[0]}:")
                 print(f"\t\t\tFROM:\t{c[1][0]}")
                 print(f"\t\t\tTO:\t{c[1][1]}")
         if report["added"]:
             print("\tADDED:")
         for a in report["added"]:
-            print(f"\t\t{a[0]}:")
+            if type(a[0]) is list:
+                print(f"\t\t{'-'.join([str(name) for name in a[0]][:-1])}:")
+            else:
+                print(f"\t\t{a[0]}:")
             print(f"\t\t\t{newline.join(sorted(a[1][0][1]))}")
         if report["removed"]:
             print("\tREMOVED:")
         for r in report["removed"]:
-            print(f"\t\t{r[0]}:")
+            if type(r[0]) is list:
+                print(f"\t\t{'-'.join([str(name) for name in r[0]][:-1])}:")
+            else:
+                print(f"\t\t{r[0]}:")
             print(f"\t\t\t{newline.join(sorted(r[1][0][1]))}")
     print("\n")
