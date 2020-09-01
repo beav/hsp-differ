@@ -8,6 +8,7 @@ import sys
 from difflib import unified_diff
 
 import dateparser
+import datetime
 from dictdiffer import diff
 from tqdm.auto import tqdm
 
@@ -267,7 +268,7 @@ if args.from_date and args.to_date:
     
     for hsp in sorted_hsps:
         captured = dateparser.parse(hsp['captured_date'])
-        if from_date < captured < to_date:
+        if from_date < captured < to_date + datetime.timedelta(days=1):
             ranged_sorted_hsps.append(hsp)
     sorted_hsps = ranged_sorted_hsps
     if not sorted_hsps:
