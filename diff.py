@@ -300,24 +300,26 @@ for comparison in _fetch_comparison(sorted_hsps):
     if len(report["changes"]) + len(report["added"]) + len(report["removed"]) == 0:
         continue
     elif len(report["changes"]) == 1 and report["changes"][0][0] == "captured_date":
-        print(
-            f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE\n"
-        )
+        print(f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE")
     else:
         for change in report["changes"]:
             if change[0] == "captured_date":
                 print(f"changes from {change[1][0]} to {change[1][1]}")
+        if report["changes"]:
+            print("\tCHANGED:")
         for c in report["changes"]:
             if c[0] != "captured_date":
-                print("\tCHANGED:")
                 print(f"\t\t{c[0]}:")
                 print(f"\t\t\tFROM:\t{c[1][0]}")
                 print(f"\t\t\tTO:\t{c[1][1]}")
-        for a in report["added"]:
+        if report["added"]:
             print("\tADDED:")
+        for a in report["added"]:
             print(f"\t\t{a[0]}:")
             print(f"\t\t\t{newline.join(sorted(a[1][0][1]))}")
-        for r in report["removed"]:
+        if report["removed"]:
             print("\tREMOVED:")
+        for r in report["removed"]:
             print(f"\t\t{r[0]}:")
             print(f"\t\t\t{newline.join(sorted(r[1][0][1]))}")
+    print("\n")
