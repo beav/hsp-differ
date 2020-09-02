@@ -19,6 +19,7 @@ get_host_url = "https://%s/api/inventory/v1/hosts/%s"
 get_profile_url = "https://%s/api/historical-system-profiles/v1/profiles/%s"
 get_profile_list_url = "https://%s/api/historical-system-profiles/v1/systems/%s"
 
+months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 class SetEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -268,7 +269,7 @@ if args.from_date and args.to_date:
             ranged_sorted_hsps.append(hsp)
     sorted_hsps = ranged_sorted_hsps
     print(
-        f"Change report for {display_name} from {args.from_date} to {args.to_date}\n\n"
+            f"Change report for {display_name} from {from_date.day} {months[from_date.month - 1]} {from_date.year}, {from_date.hour}:{from_date.minute} {from_date.tzname()[:3]} to {to_date.day} {months[to_date.month - 1]} {to_date.year}, {to_date.hour}:{to_date.minute} {to_date.tzname()[:3]}\n\n"
     )
     if not sorted_hsps:
         print("No hsps within this date range.")
@@ -282,8 +283,10 @@ if args.diff_view:
 
 # TODO:  refactor and put "diff_view" check in an if/else; get rid of exit(0)
 if not args.from_date and not args.to_date:
+    captured_from = dateparser.parse(sorted_hsps[0]['captured_date'])
+    captured_to = dateparser.parse(sorted_hsps[-1]['captured_date'])
     print(
-        f"Change report for {display_name} from {sorted_hsps[0]['captured_date']} to {sorted_hsps[-1]['captured_date']}\n\n"
+            f"Change report for {display_name} from {captured_from.day} {months[captured_from.month - 1]} {captured_from.year}, {captured_from.hour}:{captured_from.minute} {captured_from.tzname()[:3]} to {captured_to.day} {months[captured_to.month - 1]} {captured_to.year}, {captured_to.hour}:{captured_to.minute} {captured_to.tzname()[:3]}\n\n"
     )
 
 for comparison in _fetch_comparison(sorted_hsps):
@@ -300,13 +303,17 @@ for comparison in _fetch_comparison(sorted_hsps):
     if len(report["changes"]) + len(report["added"]) + len(report["removed"]) == 0:
         continue
     elif len(report["changes"]) == 1 and report["changes"][0][0] == "captured_date":
+        no_change_from = dateparser.parse(report['changes'][0][1][0])
+        no_change_to = dateparser.parse(report['changes'][0][1][1])
         print(
-            f"changes from {report['changes'][0][1][0]} to {report['changes'][0][1][1]}\n\tNO CHANGE"
+                f"changes from {no_change_from.day} {months[no_change_from.month - 1]} {no_change_from.year}, {no_change_from.hour}:{no_change_from.minute} {no_change_from.tzname()[:3]} to {no_change_to.day} {months[no_change_to.month - 1]} {no_change_to.year}, {no_change_to.hour}:{no_change_to.minute} {no_change_to.tzname()[:3]}\n\tNO CHANGE"
         )
     else:
         for change in report["changes"]:
             if change[0] == "captured_date":
-                print(f"changes from {change[1][0]} to {change[1][1]}")
+                change_from = dateparser.parse(change[1][0])
+                change_to = dateparser.parse(change[1][1])
+                print(f"changes from {change_from.day} {months[change_from.month - 1]} {change_from.year}, {change_from.hour}:{change_from.minute} {change_from.tzname()[:3]} to {change_to.day} {months[change_to.month - 1]} {change_to.year}, {change_to.hour}:{change_to.minute} {change_to.tzname()[:3]}")
         if report["changes"]:
             print("\tCHANGED:")
         for c in report["changes"]:
